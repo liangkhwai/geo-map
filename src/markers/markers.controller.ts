@@ -1,7 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { MarkersService } from './markers.service';
 import { CreateMarkerDto } from './dto/create-marker.dto';
 import { UpdateMarkerDto } from './dto/update-marker.dto';
+import { GetMarkerDto } from './dto/get-marker.dto';
 
 @Controller('markers')
 export class MarkersController {
@@ -13,8 +23,8 @@ export class MarkersController {
   }
 
   @Get()
-  findAll() {
-    return this.markersService.findAll();
+  findAll(@Query() req: GetMarkerDto) {
+    return this.markersService.findAll(req);
   }
 
   @Get(':id')
