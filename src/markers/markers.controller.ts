@@ -63,7 +63,7 @@ export class MarkersController {
   @Get('/private/admin/count')
   countMarker(@Query() query: GetCountRequestDTO) {
     console.log('GET /markers/private/admin/count - Count Markers', query);
-    return this.markersService.countMarkerByPlaceId(query);
+    return this.markersService.countMarker(query);
   }
 
   @Get('/private/admin/:markerId')
