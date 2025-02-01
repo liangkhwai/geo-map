@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { Place, PlaceSchema } from './schemas/place.shema';
 import { MulterModule } from '@nestjs/platform-express';
 import { MulterConfigService } from 'src/configs/multer-config.service';
+import { MarkersModule } from 'src/markers/markers.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { MulterConfigService } from 'src/configs/multer-config.service';
     MulterModule.registerAsync({
       useClass: MulterConfigService,
     }),
+    MarkersModule,
   ],
   controllers: [PlacesController],
   providers: [PlacesService],

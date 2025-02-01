@@ -10,5 +10,6 @@ import { Markers, MarkerSchema } from './schemas/markers.schema';
   ],
   controllers: [MarkersController],
   providers: [MarkersService],
+  exports: [MarkersService],
 })
 export class MarkersModule {}

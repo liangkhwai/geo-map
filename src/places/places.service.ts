@@ -16,17 +16,22 @@ import * as xmldom from 'xmldom';
 import * as togeojson from '@mapbox/togeojson';
 import { features } from 'process';
 import { CreatePlaceDto } from './dto/create-place.dto';
+import { MarkersService } from 'src/markers/markers.service';
 
 @Injectable()
 export class PlacesService {
   constructor(
     @InjectModel(Place.name) private readonly placeModel: Model<PlaceDocument>,
+    private readonly markerService: MarkersService,
   ) {}
 
-  async create(createPlaceDto: CreatePlaceDto, files: {
-    city?: Express.Multer.File[];
-    zone?: Express.Multer.File[];
-  }) {
+  async create(
+    createPlaceDto: CreatePlaceDto,
+    files: {
+      city?: Express.Multer.File[];
+      zone?: Express.Multer.File[];
+    },
+  ) {
     try {
       const cityFile = files.city ? files.city[0] : null;
       const zoneFile = files.zone ? files.zone[0] : null;
@@ -72,13 +77,15 @@ export class PlacesService {
   async findAll(keywords: QueryPlaceDto) {
     try {
       const pipeline: any[] = [];
-
+      const summary:any = {};
+      
       if (keywords.placeId) {
         pipeline.push({
           $match: {
             _id: new Types.ObjectId(keywords.placeId),
           },
         });
+        summary["placeId"] = keywords.placeId;
       }
 
       if (keywords.zoneId) {
@@ -92,6 +99,7 @@ export class PlacesService {
             },
           },
         );
+        summary["zoneId"] = keywords.zoneId;
       }
 
       if (!keywords.placeId && !keywords.zoneId) {
@@ -102,11 +110,20 @@ export class PlacesService {
 
       const response = await this.placeModel.aggregate(pipeline).exec();
 
+      const summaryCountMarker = await this.markerService.countMarker({
+        placeId: summary["placeId"],
+        zoneId: summary["zoneId"],
+        markerType: ""
+      })
+
       if (!response || response.length === 0) {
         return [];
       }
 
-      return response;
+      return {
+        data: response,
+        markerCount: summaryCountMarker
+      };
     } catch (error) {
       throw new InternalServerErrorException(
         'Error retrieving places',
@@ -159,6 +176,7 @@ export class PlacesService {
       if (!place) {
         throw new NotFoundException(`Place with ID ${id} not found`);
       }
+
       return place;
     } catch (error) {
       throw new NotFoundException(`Failed to find place: ${error.message}`);
@@ -170,7 +188,7 @@ export class PlacesService {
       const updatedPlace = await this.placeModel.findByIdAndUpdate(
         id,
         {
-          $set: updatePlaceDto, 
+          $set: updatePlaceDto,
         },
         { new: true },
       );
