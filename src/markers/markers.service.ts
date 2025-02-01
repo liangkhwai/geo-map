@@ -277,10 +277,11 @@ export class MarkersService {
     }
   }
 
-  async countMarkerByPlaceId(query: GetCountRequestDTO): Promise<number> {
-    const { placeId, zoneId } = query;
+  async countMarker(query: GetCountRequestDTO): Promise<number> {
+    const { placeId, zoneId, markerType } = query;
+    console.log(query);
     try {
-      const filter: object = {
+      const filter: Record<string, any> = {
         deletedAt: null,
       };
       if (placeId) {
@@ -289,6 +290,10 @@ export class MarkersService {
       if (zoneId) {
         filter['properties.places.zoneId'] = zoneId;
       }
+      if (markerType) {
+        filter['properties.markerType'] = markerType;
+      }
+      console.log(filter);
       const result = await this.MarkerRepository.countDocuments(filter);
       return result;
     } catch (error) {

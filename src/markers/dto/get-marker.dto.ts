@@ -24,6 +24,8 @@ export class GetCountRequestDTO {
   placeId: string | ObjectId;
   @IsOptional()
   zoneId: string | ObjectId;
+  @IsOptional()
+  markerType:string
 }
 
 export class GetMakerDataDTO {
