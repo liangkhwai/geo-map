@@ -7,9 +7,11 @@ import {
   IsObject,
   IsMongoId,
   IsNotEmptyObject,
+  IsNotEmpty,
 } from 'class-validator';
 import { ObjectId } from 'mongoose';
 import { Position } from 'geojson';
+import { Socials } from '../schemas/markers.schema';
 
 // Person DTO
 class Person {
@@ -20,14 +22,18 @@ class Person {
   @IsString()
   firstName: string;
 
+  @IsNotEmpty()
+  @IsString()
+  lastName: string;
+
+  @IsString()
+  idCard: string;
+
   @IsString()
   placeName: string;
 
   @IsString()
   zoneName: string;
-
-  @IsString()
-  lastName: string;
 
   @IsOptional()
   @IsString()
@@ -75,7 +81,7 @@ class OTOP {
   @IsOptional()
   @IsArray()
   @IsObject({ each: true })
-  socials?: { link: string; label: string }[];
+  socials?: Socials[];
 }
 
 // Places DTO
@@ -88,18 +94,21 @@ class Places {
 }
 
 // Properties DTO
-class Properties {
+export class Properties {
+  @IsNotEmpty()
   @IsString()
   markerType: string;
 
-  detail: Person | OTOP;
+  name: string;
+  users: Person;
+  otop: OTOP;
 
   @IsNotEmptyObject()
   places: Places;
 }
 
 // Location DTO
-class Geometry {
+export class Geometry {
   @IsEnum(['Point'])
   type: 'Point';
 
