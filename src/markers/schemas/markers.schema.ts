@@ -3,6 +3,7 @@ import { Types } from 'mongoose';
 import { Point } from 'geojson';
 
 // 📌 Places Schema
+@Schema({ _id: false })
 export class Places {
   @Prop({ type: String, required: true })
   placeId: string;
@@ -10,6 +11,7 @@ export class Places {
   @Prop({ type: String, required: true })
   zoneId: string;
 }
+export const placeSchema = SchemaFactory.createForClass(Places);
 
 // 📌 ImagePath Schema (Subdocument)
 @Schema({}) // Ensure virtuals are included in JSON responses
@@ -80,8 +82,8 @@ export class Person {
   @Prop({ type: String, required: true })
   zoneName: string;
 
-  @Prop({type: String})
-  idCard:string
+  @Prop({ type: String })
+  idCard: string;
 
   @Prop({ type: String })
   gender?: string;
@@ -105,14 +107,14 @@ export class Properties {
   @Prop({ type: String, required: true })
   markerType: string;
 
-  @Prop({ type: personSchema, required: false })
-  users?: Person;
+  @Prop({ type: personSchema, required: true })
+  users: Person;
 
   @Prop({ type: otopSchema, required: false })
   otop?: OTOP;
 
-  @Prop({ type: Places, required: false })
-  places?: Places;
+  @Prop({ type: placeSchema, required: true })
+  places: Places;
 }
 export const propertiesSchema = SchemaFactory.createForClass(Properties);
 
