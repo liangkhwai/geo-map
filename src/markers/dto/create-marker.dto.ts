@@ -100,6 +100,7 @@ export class Properties {
   markerType: string;
 
   name: string;
+  @IsNotEmpty()
   users: Person;
   otop: OTOP;
 
