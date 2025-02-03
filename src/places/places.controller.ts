@@ -1,20 +1,37 @@
-import { Controller, Get, Post, Body, Patch, Param, Query, UseInterceptors, UploadedFile, UploadedFiles, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Query,
+  UseInterceptors,
+  UploadedFiles,
+  Delete,
+} from '@nestjs/common';
 import { PlacesService } from './places.service';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 import { QueryPlaceDto } from './dto/query-place.dto';
-import { FileFieldsInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 
 @Controller('places')
 export class PlacesController {
   constructor(private readonly placesService: PlacesService) {}
 
   @Post()
-  @UseInterceptors(FileFieldsInterceptor([
-    { name: 'city', maxCount: 1 },
-    { name: 'zone', maxCount: 1 },
-  ]))
-  create(@Body() createPlaceDto: CreatePlaceDto, @UploadedFiles() files: { city?: Express.Multer.File[], zone?: Express.Multer.File[] }) {
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'city', maxCount: 1 },
+      { name: 'zone', maxCount: 1 },
+    ]),
+  )
+  create(
+    @Body() createPlaceDto: CreatePlaceDto,
+    @UploadedFiles()
+    files: { city?: Express.Multer.File[]; zone?: Express.Multer.File[] },
+  ) {
     return this.placesService.create(createPlaceDto, files);
   }
 
@@ -23,24 +40,35 @@ export class PlacesController {
     return this.placesService.findAll(keywords);
   }
 
-  @Get("city")
-  findAllCityAndIds(){
+  @Get('city')
+  findAllCityAndIds() {
     return this.placesService.findAllCityAndIds();
   }
 
-  @Get("zone")
-  findAllZoneAndIds(){
-    return this.placesService.findAllZoneAndIds();
+  @Get('zone')
+  findAllZoneAndIds(@Query() keywords: { placeId: string }) {
+    return this.placesService.findAllZoneAndIds(keywords);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.placesService.findOne(+id);
+    return this.placesService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePlaceDto: UpdatePlaceDto) {
-    return this.placesService.update(id, updatePlaceDto);
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'city', maxCount: 1 },
+      { name: 'zone', maxCount: 1 },
+    ]),
+  )
+  update(
+    @Param('id') id: string,
+    @Body() updatePlaceDto: UpdatePlaceDto,
+    @UploadedFiles()
+    files: { city?: Express.Multer.File[]; zone?: Express.Multer.File[] },
+  ) {
+    return this.placesService.update(id, updatePlaceDto, files);
   }
 
   @Delete(':id')

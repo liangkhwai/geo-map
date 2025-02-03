@@ -14,7 +14,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as xmldom from 'xmldom';
 import * as togeojson from '@mapbox/togeojson';
-import { features } from 'process';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { MarkersService } from 'src/markers/markers.service';
 
@@ -77,15 +76,16 @@ export class PlacesService {
   async findAll(keywords: QueryPlaceDto) {
     try {
       const pipeline: any[] = [];
-      const summary:any = {};
-      
+      const summary: any = {};
+
       if (keywords.placeId) {
         pipeline.push({
           $match: {
             _id: new Types.ObjectId(keywords.placeId),
+            deletedAt: { $eq: null },
           },
         });
-        summary["placeId"] = keywords.placeId;
+        summary['placeId'] = new Types.ObjectId(keywords.placeId);
       }
 
       if (keywords.zoneId) {
@@ -96,25 +96,26 @@ export class PlacesService {
           {
             $match: {
               'zones.features._id': new Types.ObjectId(keywords.zoneId),
+              'zones.features.deletedAt': { $eq: null },
             },
           },
         );
-        summary["zoneId"] = keywords.zoneId;
+        summary['zoneId'] = new Types.ObjectId(keywords.zoneId);
       }
 
       if (!keywords.placeId && !keywords.zoneId) {
         pipeline.push({
-          $match: {},
+          $match: { deletedAt: { $eq: null } },
         });
       }
 
       const response = await this.placeModel.aggregate(pipeline).exec();
 
       const summaryCountMarker = await this.markerService.countMarker({
-        placeId: summary["placeId"],
-        zoneId: summary["zoneId"],
-        markerType: ""
-      })
+        placeId: summary['placeId'],
+        zoneId: summary['zoneId'],
+        markerType: '',
+      });
 
       if (!response || response.length === 0) {
         return [];
@@ -122,7 +123,7 @@ export class PlacesService {
 
       return {
         data: response,
-        markerCount: summaryCountMarker
+        markerCount: summaryCountMarker,
       };
     } catch (error) {
       throw new InternalServerErrorException(
@@ -135,7 +136,7 @@ export class PlacesService {
   async findAllCityAndIds() {
     try {
       const places = await this.placeModel
-        .find({}, { 'place.features': 1 })
+        .find({deletedAt: { $eq: null }}, { 'place.features': 1 })
         .exec();
 
       const response = places.flatMap((plcae) =>
@@ -151,10 +152,16 @@ export class PlacesService {
     }
   }
 
-  async findAllZoneAndIds() {
+  async findAllZoneAndIds(keywords?: {placeId: string}) {
     try {
+      const query: any = { deletedAt: { $eq: null } };
+      
+      if (keywords?.placeId){
+        query["_id"] = new Types.ObjectId(keywords.placeId);
+      }
+
       const places = await this.placeModel
-        .find({}, { 'zones.features': 1 })
+        .find(query, { 'zones.features': 1 })
         .exec();
 
       const response = places.flatMap((plcae) =>
@@ -170,9 +177,12 @@ export class PlacesService {
     }
   }
 
-  async findOne(id: number) {
+  async findOne(id: string) {
     try {
-      const place = await this.placeModel.findById(id).exec();
+      const _id = new Types.ObjectId(id);
+      const place = await this.placeModel
+        .findById({ _id, deletedAt: null })
+        .exec();
       if (!place) {
         throw new NotFoundException(`Place with ID ${id} not found`);
       }
@@ -183,20 +193,44 @@ export class PlacesService {
     }
   }
 
-  async update(id: string, updatePlaceDto: UpdatePlaceDto) {
+  async update(
+    id: string,
+    updatePlaceDto: UpdatePlaceDto,
+    files?: {
+      city?: Express.Multer.File[];
+      zone?: Express.Multer.File[];
+    },
+  ) {
     try {
-      const updatedPlace = await this.placeModel.findByIdAndUpdate(
-        id,
-        {
-          $set: updatePlaceDto,
-        },
-        { new: true },
-      );
-      if (!updatedPlace) {
-        throw new NotFoundException('Place not found');
+      const _id = new Types.ObjectId(id);
+      const existingPlace = await this.placeModel.findOne({
+        _id,
+        deletedAt: null,
+      });
+
+      if (!existingPlace) {
+        throw new NotFoundException(`Place with ID ${id} not found`);
       }
 
-      return updatedPlace;
+      if (files?.city?.[0]) {
+        existingPlace.place = this.convertKMZtoGeoJSON(files.city[0].path);
+      }
+      if (files?.zone?.[0]) {
+        existingPlace.zones = this.convertKMZtoGeoJSON(files.zone[0].path);
+      }
+
+      Object.assign(existingPlace, updatePlaceDto);
+
+      await existingPlace.save();
+
+      if (files?.city?.[0]) {
+        await fs.promises.unlink(files.city[0].path);
+      }
+      if (files?.zone?.[0]) {
+        await fs.promises.unlink(files.zone[0].path);
+      }
+
+      return existingPlace;
     } catch (error) {
       throw new InternalServerErrorException('Error updating place');
     }
@@ -204,11 +238,13 @@ export class PlacesService {
 
   async delete(id: string): Promise<string> {
     try {
-      const placeToDelete = await this.placeModel.findByIdAndDelete(id);
+      const placeToDelete = await this.findOne(id);
 
       if (!placeToDelete) {
         throw new NotFoundException('Place not found');
       }
+
+      await this.placeModel.findByIdAndUpdate(id, { deletedAt: new Date() });
 
       return 'Place deleted successfully';
     } catch (error) {
