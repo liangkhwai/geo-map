@@ -1,5 +1,4 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Point } from 'geojson';
 
 export type PlaceDocument = Place & Document;
 
@@ -90,6 +89,8 @@ export class Place{
       };
     }>;
   };
+
+  deletedAt: { type: Date, default: null }
 }
 
 export const PlaceSchema = SchemaFactory.createForClass(Place);
