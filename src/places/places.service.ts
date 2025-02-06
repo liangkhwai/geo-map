@@ -111,7 +111,15 @@ export class PlacesService {
         summary['zoneId'] = new Types.ObjectId(keywords.zoneId);
       }
 
-      if (!keywords.placeId && !keywords.zoneId) {
+      if (keywords.provinceId) {
+        pipeline.push({
+          $match: {
+            province: new Types.ObjectId(keywords.provinceId),
+          },
+        });
+      }
+
+      if (!keywords.placeId && !keywords.zoneId && !keywords.provinceId) {
         pipeline.push({
           $match: { deletedAt: { $eq: null } },
         });
@@ -120,9 +128,9 @@ export class PlacesService {
       pipeline.push({
         $lookup: {
           from: 'provinces',
-          localField: 'province', 
+          localField: 'province',
           foreignField: '_id',
-          as: 'province', 
+          as: 'province',
         },
       });
 
@@ -248,7 +256,7 @@ export class PlacesService {
       const _id = new Types.ObjectId(id);
       const place = await this.placeModel
         .findById({ _id, deletedAt: null })
-        .populate("province")
+        .populate('province')
         .exec();
 
       if (!place) {
