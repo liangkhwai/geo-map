@@ -3,10 +3,11 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { Place, PlaceDocument } from './schemas/place.shema';
+import { Place, PlaceDocument } from './schemas/place.schema';
 import { Model, Types } from 'mongoose';
 import { QueryPlaceDto } from './dto/query-place.dto';
 import * as AdmZip from 'adm-zip';
@@ -16,33 +17,36 @@ import * as xmldom from 'xmldom';
 import * as togeojson from '@mapbox/togeojson';
 import { CreatePlaceDto } from './dto/create-place.dto';
 import { MarkersService } from 'src/markers/markers.service';
+import { Province, ProvinceDocument } from './schemas/province.schema';
+import { Geography, GeographyDocument } from './schemas/geography.schema';
 
 @Injectable()
 export class PlacesService {
   constructor(
     @InjectModel(Place.name) private readonly placeModel: Model<PlaceDocument>,
+    @InjectModel(Province.name)
+    private readonly provinceModel: Model<ProvinceDocument>,
+    @InjectModel(Geography.name)
+    private readonly geographyModel: Model<GeographyDocument>,
     private readonly markerService: MarkersService,
   ) {}
 
   async create(
     createPlaceDto: CreatePlaceDto,
-    files: {
-      city?: Express.Multer.File[];
-      zone?: Express.Multer.File[];
-    },
+    files: { city?: Express.Multer.File[]; zone?: Express.Multer.File[] },
   ) {
     try {
-      const cityFile = files.city ? files.city[0] : null;
-      const zoneFile = files.zone ? files.zone[0] : null;
+      const cityFile = files.city?.[0] || null;
+      const zoneFile = files.zone?.[0] || null;
 
       if (!cityFile || !zoneFile) {
-        return {
-          message: 'Both city and zone files are required.',
-        };
+        throw new BadRequestException('Both city and zone files are required.');
       }
 
-      const cityData = this.convertKMZtoGeoJSON(cityFile.path);
-      const zoneData = this.convertKMZtoGeoJSON(zoneFile.path);
+      const [cityData, zoneData] = await Promise.all([
+        this.convertKMZtoGeoJSON(cityFile.path),
+        this.convertKMZtoGeoJSON(zoneFile.path),
+      ]);
 
       if (
         cityData.type !== 'FeatureCollection' ||
@@ -51,21 +55,25 @@ export class PlacesService {
         throw new BadRequestException('Invalid GeoJSON format');
       }
 
+      if (
+        !Array.isArray(createPlaceDto.pinTypes) ||
+        !createPlaceDto.pinTypes.every((pin) => typeof pin === 'string')
+      ) {
+        throw new BadRequestException('pinTypes must be an array of strings.');
+      }
+
       const newPlace = new this.placeModel({
-        municipalityName: createPlaceDto.municipalityName,
-        provinceName: createPlaceDto.provinceName,
-        amphurName: createPlaceDto.amphurName,
-        tambolName: createPlaceDto.tambolName,
-        postCode: createPlaceDto.postCode,
-        location: createPlaceDto.location,
+        ...createPlaceDto,
         place: cityData,
         zones: zoneData,
       });
 
       await newPlace.save();
 
-      await fs.promises.unlink(cityFile.path);
-      await fs.promises.unlink(zoneFile.path);
+      await Promise.all([
+        fs.promises.unlink(cityFile.path),
+        fs.promises.unlink(zoneFile.path),
+      ]);
 
       return newPlace;
     } catch (error) {
@@ -109,6 +117,22 @@ export class PlacesService {
         });
       }
 
+      pipeline.push({
+        $lookup: {
+          from: 'provinces',
+          localField: 'province', 
+          foreignField: '_id',
+          as: 'province', 
+        },
+      });
+
+      pipeline.push({
+        $unwind: {
+          path: '$province',
+          preserveNullAndEmptyArrays: true,
+        },
+      });
+
       const response = await this.placeModel.aggregate(pipeline).exec();
 
       const summaryCountMarker = await this.markerService.countMarker({
@@ -136,7 +160,7 @@ export class PlacesService {
   async findAllCityAndIds() {
     try {
       const places = await this.placeModel
-        .find({deletedAt: { $eq: null }}, { 'place.features': 1 })
+        .find({ deletedAt: { $eq: null } }, { 'place.features': 1 })
         .exec();
 
       const response = places.flatMap((plcae) =>
@@ -152,12 +176,12 @@ export class PlacesService {
     }
   }
 
-  async findAllZoneAndIds(keywords?: {placeId: string}) {
+  async findAllZoneAndIds(keywords?: { placeId: string }) {
     try {
       const query: any = { deletedAt: { $eq: null } };
-      
-      if (keywords?.placeId){
-        query["_id"] = new Types.ObjectId(keywords.placeId);
+
+      if (keywords?.placeId) {
+        query['_id'] = new Types.ObjectId(keywords.placeId);
       }
 
       const places = await this.placeModel
@@ -177,12 +201,56 @@ export class PlacesService {
     }
   }
 
+  async findAllProvinces(keywords?: { geographyId: string }) {
+    try {
+      const query: any = {};
+
+      if (keywords?.geographyId) {
+        query['geography_id'] = keywords.geographyId;
+      }
+
+      const provinces = await this.provinceModel.find(query).exec();
+
+      return provinces;
+    } catch (error) {
+      throw new InternalServerErrorException('Error retrieving provinces');
+    }
+  }
+
+  async findAllNameProvinces(keywords?: { geographyId: string }) {
+    try {
+      const query: any = {};
+
+      if (keywords?.geographyId) {
+        query['geography_id'] = keywords.geographyId;
+      }
+
+      return await this.provinceModel
+        .find(query, { _id: 1, name_th: 1 })
+        .exec();
+    } catch (error) {
+      throw new InternalServerErrorException();
+    }
+  }
+
+  async findAllGeographies() {
+    try {
+      const geographies = await this.geographyModel.find({}, { _id: 0 }).exec();
+
+      return geographies;
+    } catch (error) {
+      throw new InternalServerErrorException('Error retrieving provinces');
+    }
+  }
+
   async findOne(id: string) {
     try {
       const _id = new Types.ObjectId(id);
       const place = await this.placeModel
         .findById({ _id, deletedAt: null })
+        .populate("province")
         .exec();
+
       if (!place) {
         throw new NotFoundException(`Place with ID ${id} not found`);
       }
@@ -196,10 +264,7 @@ export class PlacesService {
   async update(
     id: string,
     updatePlaceDto: UpdatePlaceDto,
-    files?: {
-      city?: Express.Multer.File[];
-      zone?: Express.Multer.File[];
-    },
+    files?: { city?: Express.Multer.File[]; zone?: Express.Multer.File[] },
   ) {
     try {
       const _id = new Types.ObjectId(id);
@@ -212,27 +277,53 @@ export class PlacesService {
         throw new NotFoundException(`Place with ID ${id} not found`);
       }
 
-      if (files?.city?.[0]) {
-        existingPlace.place = this.convertKMZtoGeoJSON(files.city[0].path);
-      }
-      if (files?.zone?.[0]) {
-        existingPlace.zones = this.convertKMZtoGeoJSON(files.zone[0].path);
+      const geoJsonUpdates: Partial<{ place: any; zones: any }> = {};
+
+      if (files?.city?.[0] || files?.zone?.[0]) {
+        const [cityData, zoneData] = await Promise.all([
+          files?.city?.[0]
+            ? this.convertKMZtoGeoJSON(files.city[0].path)
+            : null,
+          files?.zone?.[0]
+            ? this.convertKMZtoGeoJSON(files.zone[0].path)
+            : null,
+        ]);
+
+        if (cityData?.type !== 'FeatureCollection' && cityData !== null) {
+          throw new BadRequestException('Invalid GeoJSON format for city');
+        }
+        if (zoneData?.type !== 'FeatureCollection' && zoneData !== null) {
+          throw new BadRequestException('Invalid GeoJSON format for zone');
+        }
+
+        if (cityData) geoJsonUpdates.place = cityData;
+        if (zoneData) geoJsonUpdates.zones = zoneData;
       }
 
-      Object.assign(existingPlace, updatePlaceDto);
+      if (
+        updatePlaceDto.pinTypes &&
+        (!Array.isArray(updatePlaceDto.pinTypes) ||
+          !updatePlaceDto.pinTypes.every((pin) => typeof pin === 'string'))
+      ) {
+        throw new BadRequestException('pinTypes must be an array of strings.');
+      }
+
+      Object.assign(existingPlace, updatePlaceDto, geoJsonUpdates);
 
       await existingPlace.save();
 
-      if (files?.city?.[0]) {
-        await fs.promises.unlink(files.city[0].path);
-      }
-      if (files?.zone?.[0]) {
-        await fs.promises.unlink(files.zone[0].path);
+      if (files?.city?.[0] || files?.zone?.[0]) {
+        await Promise.all([
+          files?.city?.[0] ? fs.promises.unlink(files.city[0].path) : null,
+          files?.zone?.[0] ? fs.promises.unlink(files.zone[0].path) : null,
+        ]);
       }
 
       return existingPlace;
     } catch (error) {
-      throw new InternalServerErrorException('Error updating place');
+      throw new InternalServerErrorException(
+        `Error updating place: ${error.message}`,
+      );
     }
   }
 
