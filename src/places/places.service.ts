@@ -118,13 +118,7 @@ export class PlacesService {
           },
         });
       }
-
-      if (!keywords.placeId && !keywords.zoneId && !keywords.provinceId) {
-        pipeline.push({
-          $match: { deletedAt: { $eq: null } },
-        });
-      }
-
+      
       pipeline.push({
         $lookup: {
           from: 'provinces',
@@ -140,6 +134,20 @@ export class PlacesService {
           preserveNullAndEmptyArrays: true,
         },
       });
+
+      if (keywords.geographyId) {
+        pipeline.push({
+          $match: {
+            'province.geography_id': Number(keywords.geographyId),
+          },
+        });
+      }
+
+      if (!keywords.placeId && !keywords.zoneId && !keywords.provinceId && !keywords.geographyId) {
+        pipeline.push({
+          $match: { deletedAt: { $eq: null } },
+        });
+      }
 
       const response = await this.placeModel.aggregate(pipeline).exec();
 
