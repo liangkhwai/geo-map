@@ -50,6 +50,21 @@ export class PlacesController {
     return this.placesService.findAllZoneAndIds(keywords);
   }
 
+  @Get('province')
+  findAllProvinces(@Query() keywords: {geographyId: string}) {
+    return this.placesService.findAllProvinces(keywords);
+  }
+
+  @Get('province/name')
+  findAllNameProvinces(@Query() keywords: {geographyId: string}) {
+    return this.placesService.findAllNameProvinces(keywords);
+  }
+
+  @Get('geography')
+  findAllGeographies() {
+    return this.placesService.findAllGeographies();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.placesService.findOne(id);

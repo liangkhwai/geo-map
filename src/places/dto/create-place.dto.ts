@@ -1,3 +1,5 @@
+import { Types } from 'mongoose';
+
 class GeometryDTO {
   type: string;
   coordinates: number[][][];
@@ -16,7 +18,7 @@ class FeatureCollectionDTO {
 
 export class CreatePlaceDto {
   municipalityName: string;
-  provinceName: string;
+  province: Types.ObjectId | string;
   amphurName: string;
   tambolName: string;
   postCode: string;
@@ -24,4 +26,5 @@ export class CreatePlaceDto {
     type: string,
     coordinates: [number, number]
   }
+  pinTypes: string[]
 }

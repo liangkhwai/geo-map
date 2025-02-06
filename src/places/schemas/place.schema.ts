@@ -1,26 +1,27 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import mongoose from 'mongoose';
 
 export type PlaceDocument = Place & Document;
 
-@Schema({ timestamps: true})
-export class Place{
-  @Prop({type: String})
+@Schema({ timestamps: true })
+export class Place {
+  @Prop({ type: String })
   placeId: String;
 
-  @Prop({type: String, required: true})
-  municipalityName: string
-  
-  @Prop({type: String, required: true})
-  provinceName: string
+  @Prop({ type: String, required: true })
+  municipalityName: string;
 
-  @Prop({type: String, required: true})
-  amphurName: string
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Province', required: true })
+  province: mongoose.Schema.Types.ObjectId;
 
-  @Prop({type: String, required: true})
-  tambolName: string
+  @Prop({ type: String, required: true })
+  amphurName: string;
 
-  @Prop({type: String, required: true})
-  postCode: string
+  @Prop({ type: String, required: true })
+  tambolName: string;
+
+  @Prop({ type: String, required: true })
+  postCode: string;
 
   @Prop({
     type: { type: String, enum: ['Point'], required: true },
@@ -38,16 +39,17 @@ export class Place{
       {
         type: { type: String, enum: ['Feature'], required: true },
         properties: {
-         type: Object, default: {}
+          type: Object,
+          default: {},
         },
         geometry: {
           type: { type: String, enum: ['Polygon'], required: true },
-          coordinates: { type: [[[Number]]], required: true }, 
+          coordinates: { type: [[[Number]]], required: true },
         },
       },
     ],
   })
-  place:  {
+  place: {
     type: string;
     features: Array<{
       type: string;
@@ -69,16 +71,17 @@ export class Place{
       {
         type: { type: String, enum: ['Feature'], required: true },
         properties: {
-          type: Object, default: {}
+          type: Object,
+          default: {},
         },
         geometry: {
           type: { type: String, enum: ['Polygon'], required: true },
-          coordinates: { type: [[[Number]]], required: true }, 
+          coordinates: { type: [[[Number]]], required: true },
         },
       },
     ],
   })
-  zones:  {
+  zones: {
     type: string;
     features: Array<{
       type: string;
@@ -90,25 +93,35 @@ export class Place{
     }>;
   };
 
-  deletedAt: { type: Date, default: null }
+  @Prop({ type: [String], default: [] })
+  pinTypes: string[];
+
+  @Prop({ type: Date, default: null })
+  deletedAt?: Date | null = null;
 }
 
 export const PlaceSchema = SchemaFactory.createForClass(Place);
 
-PlaceSchema.index({"place.location": "2dsphere"});
+PlaceSchema.index({ 'place.location': '2dsphere' });
 
 PlaceSchema.pre('save', async function (next) {
   const place = this;
 
   if (!place.placeId) {
     try {
-      const lastPlace = await this.model('Place').findOne().sort({ placeId: -1 }).limit(1).exec();
-      const lastId = lastPlace ? parseInt((lastPlace as unknown as PlaceDocument).placeId.substring(2)) : 0;
+      const lastPlace = await this.model('Place')
+        .findOne()
+        .sort({ placeId: -1 })
+        .limit(1)
+        .exec();
+      const lastId = lastPlace
+        ? parseInt((lastPlace as unknown as PlaceDocument).placeId.substring(2))
+        : 0;
 
       place.placeId = `CT${String(lastId + 1).padStart(2, '0')}`;
     } catch (error) {
-      console.error("Error generating placeId:", error);
-      place.placeId = 'CT01'; 
+      console.error('Error generating placeId:', error);
+      place.placeId = 'CT01';
     }
   }
 
