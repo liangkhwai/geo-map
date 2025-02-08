@@ -65,6 +65,11 @@ export class PlacesController {
     return this.placesService.findAllGeographies();
   }
 
+  @Get('pin')
+  findAllPinTypes(@Query() keywords: {placeId: string}) {
+    return this.placesService.findPinTypes(keywords);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.placesService.findOne(id);

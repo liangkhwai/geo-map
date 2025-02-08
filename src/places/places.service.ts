@@ -259,6 +259,22 @@ export class PlacesService {
     }
   }
 
+  async findPinTypes(keywords?: {placeId: string}){
+    try {
+      const query: any = {}
+
+      if (keywords?.placeId){
+        query["_id"] = keywords.placeId;
+      }
+
+      const places = await this.placeModel.find(query, {"pinTypes": 1}).exec();
+
+      return places;
+    } catch (error) {
+      throw new InternalServerErrorException();
+    }
+  }
+
   async findOne(id: string) {
     try {
       const _id = new Types.ObjectId(id);
