@@ -61,11 +61,22 @@ export class ResponseGeometry {
   setResponse(marker: ResponseMarkerDB) {
     console.log('RESPONSE', marker);
     this._id = marker._id;
-    this.geometry = marker.geometry;
+    this.geometry = this.swapGeometryCoordinates(marker.geometry)
     this.properties = marker.properties;
     this.createdAt = marker.createdAt;
     this.updatedAt = marker.updatedAt;
     this.deletedAt = marker.deletedAt ?? null;
+  }
+  swapGeometryCoordinates(geometry: Point | null): Point | null {
+    if (
+      geometry &&
+      geometry.type === 'Point' &&
+      Array.isArray(geometry.coordinates)
+    ) {
+      const [lng, lat] = geometry.coordinates;
+      geometry.coordinates = [lat, lng]; // Swap lng,lat to lat,lng
+    }
+    return geometry;
   }
 
   toJSON(): object {

@@ -60,6 +60,7 @@ export class MarkersService {
         geometry: 1,
         createdAt: 1,
         updatedAt: 1,
+        'properties.name': 1,
         'properties.markerType': 1,
         'properties.places': 1,
         'properties.otop': 1,
