@@ -23,6 +23,12 @@ export class Place {
   @Prop({ type: String, required: true })
   postCode: string;
 
+  @Prop({type: Number, required: true})
+  population: number;
+
+  @Prop({type: Number, required: true})
+  household: Number;
+
   @Prop({
     type: { type: String, enum: ['Point'], required: true },
     coordinates: { type: [Number], required: true },

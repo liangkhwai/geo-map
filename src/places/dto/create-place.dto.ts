@@ -22,6 +22,8 @@ export class CreatePlaceDto {
   amphurName: string;
   tambolName: string;
   postCode: string;
+  population: number;
+  household: Number;
   location: {
     type: string,
     coordinates: [number, number]
