@@ -149,21 +149,37 @@ export class PlacesService {
         });
       }
 
-      const response = await this.placeModel.aggregate(pipeline).exec();
+      const places = await this.placeModel.aggregate(pipeline).exec();
 
-      const summaryCountMarker = await this.markerService.countMarker({
-        placeId: summary['placeId'],
-        zoneId: summary['zoneId'],
-        markerType: '',
-      });
-
-      if (!response || response.length === 0) {
+      if (!places || places.length === 0) {
         return [];
       }
 
+      const response = await Promise.all(
+        places.map(async (res) => {
+          if (!Array.isArray(res.pinTypes)) return res;
+      
+          const pinTypesCount = await Promise.all(
+            res.pinTypes.map(async (pinType) => {
+              const count = await this.markerService.countMarker({
+                placeId: res._id,
+                zoneId: summary['zoneId'],
+                markerType: pinType,
+              });
+      
+              return { name: pinType, count: count || 0 };
+            })
+          );
+      
+          return {
+            ...res,
+            summary: pinTypesCount,
+          };
+        })
+      );
+
       return {
         data: response,
-        markerCount: summaryCountMarker,
       };
     } catch (error) {
       throw new InternalServerErrorException(
