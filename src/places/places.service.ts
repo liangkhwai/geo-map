@@ -3,7 +3,6 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
-  OnModuleInit,
 } from '@nestjs/common';
 import { UpdatePlaceDto } from './dto/update-place.dto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -118,7 +117,7 @@ export class PlacesService {
           },
         });
       }
-      
+
       pipeline.push({
         $lookup: {
           from: 'provinces',
@@ -143,7 +142,12 @@ export class PlacesService {
         });
       }
 
-      if (!keywords.placeId && !keywords.zoneId && !keywords.provinceId && !keywords.geographyId) {
+      if (
+        !keywords.placeId &&
+        !keywords.zoneId &&
+        !keywords.provinceId &&
+        !keywords.geographyId
+      ) {
         pipeline.push({
           $match: { deletedAt: { $eq: null } },
         });
@@ -158,7 +162,7 @@ export class PlacesService {
       const response = await Promise.all(
         places.map(async (res) => {
           if (!Array.isArray(res.pinTypes)) return res;
-      
+
           const pinTypesCount = await Promise.all(
             res.pinTypes.map(async (pinType) => {
               const count = await this.markerService.countMarker({
@@ -166,16 +170,16 @@ export class PlacesService {
                 zoneId: summary['zoneId'],
                 markerType: pinType,
               });
-      
+
               return { name: pinType, count: count || 0 };
-            })
+            }),
           );
-      
+
           return {
             ...res,
             summary: pinTypesCount,
           };
-        })
+        }),
       );
 
       return {
@@ -275,15 +279,153 @@ export class PlacesService {
     }
   }
 
-  async findPinTypes(keywords?: {placeId: string}){
+  async findForSummary(id: string, zoneId?: string) {
     try {
-      const query: any = {}
+      const place = await this.placeModel
+        .findOne(
+          { _id: new Types.ObjectId(id), deletedAt: null },
+          { _id: 1, pinTypes: 1, 'zones.features': 1 }
+        )
+        .exec();
+  
+      if (!place) return null;
+  
+      const zones = place?.zones?.features ?? [];
+  
+      let targetZones = zones;
+      if (zoneId) {
+        const zone = zones.find((feat) => feat["_id"].toString() === zoneId);
+        if (!zone) return null;
+        targetZones = [zone];
+      }
+  
+      const pinSummary = await Promise.all(
+        (place.pinTypes ?? []).map(async (pinType) => {
+          const totalCount = await Promise.all(
+            targetZones.map(async (zone) => {
+              const count = await this.markerService.countMarker({
+                placeId: place._id.toString(),
+                zoneId: zone["_id"].toString(),
+                markerType: pinType,
+              });
+              return count;
+            })
+          );
+  
+          return {
+            name: pinType,
+            count: totalCount.reduce((acc, val) => acc + val, 0),
+          };
+        })
+      );
+  
+      return {
+        _id: zoneId ? targetZones[0]["_id"] : place._id,
+        properties: zoneId ? targetZones[0].properties : undefined,
+        summary: pinSummary,
+      };
+    } catch (error) {
+      console.error("Error:", error);
+      throw new InternalServerErrorException();
+    }
+  }
+  
+  async findOneZoneForSummary(id: string, keywords: { zoneId: string }) {
+    try {
+      const place = await this.placeModel
+        .findOne(
+          {
+            _id: new Types.ObjectId(id),
+            deletedAt: null,
+          },
+          { _id: 1, pinTypes: 1, 'zones.features': 1 },
+        )
+        .exec();
 
-      if (keywords?.placeId){
-        query["_id"] = keywords.placeId;
+      const zone = place?.zones.features.find(
+        (feat) => feat['_id'].toString() === keywords.zoneId,
+      );
+
+      if (!zone) {
+        return null;
       }
 
-      const places = await this.placeModel.find(query, {"pinTypes": 1}).exec();
+      const markerCounts = await Promise.all(
+        (place?.pinTypes ?? []).map(async (pinType) => {
+          const count = await this.markerService.countMarker({
+            placeId: new Types.ObjectId(id).toString(),
+            zoneId: new Types.ObjectId(keywords.zoneId).toString(),
+            markerType: pinType,
+          });
+
+          return { name: pinType, count };
+        }),
+      );
+
+      return {
+        _id: zone['_id'],
+        properties: zone.properties,
+        summary: markerCounts,
+      };
+    } catch (error) {
+      throw new InternalServerErrorException();
+    }
+  }
+
+  async findOnePlaceForSummary(id: string) {
+    try {
+      const place = await this.placeModel
+        .findOne(
+          {
+            _id: new Types.ObjectId(id),
+            deletedAt: null,
+          },
+          { _id: 1, pinTypes: 1, 'zones.features': 1 },
+        )
+        .exec();
+
+      if (!place) {
+        return null;
+      }
+
+      const zones = place?.zones?.features ?? [];
+
+      const pinSummary = await Promise.all(
+        (place?.pinTypes ?? []).map(async (pin) => {
+          const totalCount = await Promise.all(
+            zones.map(async (zone) => {
+              const count = await this.markerService.countMarker({
+                placeId: new Types.ObjectId(place._id).toString(),
+                zoneId: zone['_id'],
+                markerType: pin,
+              });
+              return count;
+            }),
+          );
+          return {
+            name: pin,
+            count: totalCount.reduce((acc, val) => acc + val, 0),
+          };
+        }),
+      );
+      return {
+        _id: place._id,
+        summary: pinSummary,
+      };
+    } catch (error) {
+      throw new InternalServerErrorException();
+    }
+  }
+
+  async findPinTypes(keywords?: { placeId: string }) {
+    try {
+      const query: any = {};
+
+      if (keywords?.placeId) {
+        query['_id'] = keywords.placeId;
+      }
+
+      const places = await this.placeModel.find(query, { pinTypes: 1 }).exec();
 
       return places;
     } catch (error) {

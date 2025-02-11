@@ -51,12 +51,12 @@ export class PlacesController {
   }
 
   @Get('province')
-  findAllProvinces(@Query() keywords: {geographyId: string}) {
+  findAllProvinces(@Query() keywords: { geographyId: string }) {
     return this.placesService.findAllProvinces(keywords);
   }
 
   @Get('province/name')
-  findAllNameProvinces(@Query() keywords: {geographyId: string}) {
+  findAllNameProvinces(@Query() keywords: { geographyId: string }) {
     return this.placesService.findAllNameProvinces(keywords);
   }
 
@@ -66,8 +66,26 @@ export class PlacesController {
   }
 
   @Get('pin')
-  findAllPinTypes(@Query() keywords: {placeId: string}) {
+  findAllPinTypes(@Query() keywords: { placeId: string }) {
     return this.placesService.findPinTypes(keywords);
+  }
+
+  @Get(':id/summary')
+  findForSummary(@Param('id') id: string, @Query('zoneId') zoneId?: string) {
+    return this.placesService.findForSummary(id, zoneId);
+  }
+
+  @Get('zone-summary/:id')
+  findOneZoneForSummary(
+    @Param('id') id: string,
+    @Query() keywords: { zoneId: string },
+  ) {
+    return this.placesService.findOneZoneForSummary(id, keywords);
+  }
+
+  @Get('place-summary/:id')
+  findOnePlaceForSummary(@Param('id') id: string) {
+    return this.placesService.findOnePlaceForSummary(id);
   }
 
   @Get(':id')
