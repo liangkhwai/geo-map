@@ -1,15 +1,32 @@
+# version: '3.8'
 services:
+  app:
+    platform: linux/amd64
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    ports:
+      - '3000:3000'
+    environment:
+      - MONGO_URI=mongodb://root:example@mongodb:27017/geo-map?authSource=admin
+
+    depends_on:
+      - mongodb
+    volumes:
+      - .:/usr/src/app
+
   mongodb:
     image: mongo:6.0
     container_name: mongodb
     ports:
-      - "27017:27017"  
+      - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: root  
-      MONGO_INITDB_ROOT_PASSWORD: example  
-      MONGO_INITDB_DATABASE: geo-map
+      - MONGO_INITDB_ROOT_USERNAME:root
+      - MONGO_INITDB_ROOT_PASSWORD:example
+      - MONGO_INITDB_DATABASE:geo-map
     volumes:
       - mongo-data:/data/db
 
 volumes:
-  mongo-data:  
+  mongo-data:
