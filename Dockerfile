@@ -12,8 +12,8 @@ RUN yarn install --production=false
 # Copy the application source code
 COPY . .
 
-# Build the application
-RUN yarn build
+# Build the application (output to backend-dist)
+RUN yarn build --output-path ./backend-dist
 
 # Stage 2: Run the application
 FROM node:20-slim AS production-stage
@@ -24,7 +24,7 @@ WORKDIR /usr/src/app
 
 # Copy only necessary files from build stage
 COPY --from=build-stage /usr/src/app/package*.json ./
-COPY --from=build-stage /usr/src/app/dist ./dist
+COPY --from=build-stage /usr/src/app/backend-dist ./dist
 COPY --from=build-stage /usr/src/app/node_modules ./node_modules
 
 # Expose port
