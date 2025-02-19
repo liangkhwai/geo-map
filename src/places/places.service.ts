@@ -84,7 +84,7 @@ export class PlacesService {
     try {
       const pipeline: any[] = [];
       const summary: any = {};
-
+      pipeline.push({ $match: { deletedAt: null } });
       if (keywords.placeId) {
         pipeline.push({
           $match: {
@@ -284,52 +284,52 @@ export class PlacesService {
       const place = await this.placeModel
         .findOne(
           { _id: new Types.ObjectId(id), deletedAt: null },
-          { _id: 1, pinTypes: 1, 'zones.features': 1 }
+          { _id: 1, pinTypes: 1, 'zones.features': 1 },
         )
         .exec();
-  
+
       if (!place) return null;
-  
+
       const zones = place?.zones?.features ?? [];
-  
+
       let targetZones = zones;
       if (zoneId) {
-        const zone = zones.find((feat) => feat["_id"].toString() === zoneId);
+        const zone = zones.find((feat) => feat['_id'].toString() === zoneId);
         if (!zone) return null;
         targetZones = [zone];
       }
-  
+
       const pinSummary = await Promise.all(
         (place.pinTypes ?? []).map(async (pinType) => {
           const totalCount = await Promise.all(
             targetZones.map(async (zone) => {
               const count = await this.markerService.countMarker({
                 placeId: place._id.toString(),
-                zoneId: zone["_id"].toString(),
+                zoneId: zone['_id'].toString(),
                 markerType: pinType,
               });
               return count;
-            })
+            }),
           );
-  
+
           return {
             name: pinType,
             count: totalCount.reduce((acc, val) => acc + val, 0),
           };
-        })
+        }),
       );
-  
+
       return {
-        _id: zoneId ? targetZones[0]["_id"] : place._id,
+        _id: zoneId ? targetZones[0]['_id'] : place._id,
         properties: zoneId ? targetZones[0].properties : undefined,
         summary: pinSummary,
       };
     } catch (error) {
-      console.error("Error:", error);
+      console.error('Error:', error);
       throw new InternalServerErrorException();
     }
   }
-  
+
   async findOneZoneForSummary(id: string, keywords: { zoneId: string }) {
     try {
       const place = await this.placeModel
